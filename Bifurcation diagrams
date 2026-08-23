@@ -1,0 +1,39 @@
+function bifurcation_diagram(n, mBr, phi)
+% BIFURCATION_DIAGRAM  Reproduces the style of Figure 8 in the paper:
+% for a sweep of flow-rate values q, finds the equilibrium points near
+% the channel centerline and plots their y-coordinate, colored by type
+% (red = center, blue = saddle). Backward flow shows no points at all;
+% trapping shows a saddle pair + center; augmented flow shows the
+% saddles moved off-axis.
+%
+% Example:
+%   bifurcation_diagram(0.5, 1.0, 0.8)   % shear-thinning, like Fig 8(a)
+%   bifurcation_diagram(1.0, 1.0, 0.8)   % Newtonian,      like Fig 8(b)
+%   bifurcation_diagram(1.5, 1.0, 0.8)   % shear-thickening, like Fig 8(c)
+%
+% NOTE: this is a numerical search (finite differences + fsolve), so it
+% is meant to reproduce the qualitative shape of the paper's bifurcation
+% curves, not pixel-identical output. If points look sparse/missing,
+% increase the density of y0_list below or narrow qvals near the
+% suspected bifurcation point.
+
+    qvals = linspace(-1, 1, 81);
+
+    figure; hold on;
+    for q = qvals
+        x0_list = pi/2;                     % centerline symmetry point, see paper Sec. 2.3
+        y0_list = linspace(-0.9, 0.9, 19);  % search guesses across the channel half-width
+        [~, yc, type] = find_critical _points(n, mBr, phi, q, x0_list, y0_list);
+        for k = 1:numel(yc)
+            switch type{k}
+                case 'center'
+                    plot(q, yc(k), 'r.', 'MarkerSize', 10);
+                case 'saddle'
+                    plot(q, yc(k), 'b.', 'MarkerSize', 10);
+            end
+        end
+    end
+    xlabel('q'); ylabel('y'); grid on;
+    title(sprintf('Bifurcation diagram: n=% .2f, mBr=% .2f, \\ phi=% .2f', n, mBr, phi));
+    hold off;
+end
