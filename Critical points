@@ -1,0 +1,80 @@
+function [xc, yc, type] = find_critical _points(n, mBr, phi, q, x0_list, y0_list)
+% FIND_CRITICAL _POINTS  Locates equilibrium points of the dynamical
+% system  dx/dt = psi_y(x,y),  dy/dt = -psi_x(x,y)  (paper's Section 3),
+% i.e. points where psi_x = psi_y = 0, and classifies each as a
+% 'center' or a 'saddle' from the eigenvalues of the linearization.
+%
+% x0_list, y0_list : vectors of starting guesses to search from (a grid
+% of guesses is used because fsolve only finds local roots).
+%
+% Uses finite-difference derivatives of psi_field, so it works for any
+% n, mBr, phi, q without needing analytic derivatives of the (long)
+% closed-form solution.
+
+    xc = []; yc = []; type = {};
+
+    if exist('optimoptions', 'file')
+        opts = optimoptions('fsolve', 'Display', 'off', 'TolFun', 1e-12, 'TolX', 1e-12);
+    else
+        opts = optimset('Display', 'off', 'TolFun', 1e-12, 'TolX', 1e-12); % Octave fallback
+    end
+
+    for i = 1:numel(x0_list)
+        for j = 1:numel(y0_list)
+            x0 = x0_list(i); y0 = y0_list(j);
+            try
+                [sol, ~, exitflag] = fsolve(@(v) grad_psi(v(1), v(2), n, mBr, phi, q), [x0, y0], opts);
+            catch
+                continue
+            end
+            if exitflag <= 0
+                continue
+            end
+
+            % skip duplicates of points already found
+            is_dup = false;
+            for k = 1:numel(xc)
+                if abs(sol(1) - xc(k)) < 1e-4 && abs(sol(2) - yc(k)) < 1e-4
+                    is_dup = true; break;
+                end
+            end
+            if is_dup
+                continue
+            end
+
+            H = hessian_psi(sol(1), sol(2), n, mBr, phi, q);
+            % linearization of [dx/dt; dy/dt] = [psi_y; -psi_x]
+            M = [H(1,2), H(2,2); -H(1,1), -H(1,2)];
+            ev = eig(M);
+
+            if all(abs(imag(ev)) < 1e-8) && real(ev(1)) * real(ev(2)) < 0
+                t = 'saddle';
+            elseif all(abs(real(ev)) < 1e-6) && any(abs(imag(ev)) > 1e-8)
+                t = 'center';
+            else
+                t = 'unclassified';
+            end
+
+            xc(end+1) = sol(1); % #ok<AGROW>
+            yc(end+1) = sol(2); % #ok<AGROW>
+            type{end+1} = t;    % #ok<AGROW>
+        end
+    end
+end
+
+function g = grad_psi(x, y, n, mBr, phi, q)
+    h = 1e-6;
+    psix = (psi_field(x+h, y, n, mBr, q, phi) - psi_field(x-h, y, n, mBr, q, phi)) / (2*h);
+    psiy = (psi_field(x, y+h, n, mBr, q, phi) - psi_field(x, y-h, n, mBr, q, phi)) / (2*h);
+    g = [psix; psiy];
+end
+
+function H = hessian_psi(x, y, n, mBr, phi, q)
+    h = 1e-4;
+    f  = @(xx,yy) psi_field(xx, yy, n, mBr, q, phi);
+    f0 = f(x,y);
+    psixx = (f(x+h,y) - 2*f0 + f(x-h,y)) / h^2;
+    psiyy = (f(x,y+h) - 2*f0 + f(x,y-h)) / h^2;
+    psixy = (f(x+h,y+h) - f(x+h,y-h) - f(x-h,y+h) + f(x-h,y-h)) / (4*h^2);
+    H = [psixx, psixy; psixy, psiyy];
+end
