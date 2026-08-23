@@ -1,0 +1,31 @@
+function phase_portrait(n, mBr, phi, q, ncontours)
+% PHASE_PORTRAIT  Reproduces Figures 5-7 style streamline (phase-plane)
+% plots. Streamlines are simply contour lines of the stream function
+% psi(x,y) = const, since d x/dt = psi_y, d y/dt = -psi_x means the
+% trajectories of the dynamical system ARE the level curves of psi.
+%
+% Example (backward / trapping / augmented flow at n = 1, mBr = 1, phi = 0.8):
+%   phase_portrait(1.0, 1.0, 0.8, -0.90)   % backward flow
+%   phase_portrait(1.0, 1.0, 0.8, -0.35)   % trapping
+%   phase_portrait(1.0, 1.0, 0.8,  0.35)   % augmented flow
+
+    if nargin < 5
+        ncontours = 40;
+    end
+
+    xv = linspace(-1.5, 1.5, 300);
+    yv = linspace(-1, 1, 300);
+    [X, Y] = meshgrid(xv, yv);
+
+    PSI = zeros(size(X));
+    for i = 1:numel(X)
+        PSI(i) = psi_field(X(i), Y(i), n, mBr, q, phi);
+    end
+
+    figure;
+    contour(X, Y, PSI, ncontours, 'LineWidth', 0.75);
+    colormap(gray);
+    xlabel('x'); ylabel('y');
+    title(sprintf('n=% .2f, mBr=% .2f, \\ phi=% .2f, q=% .2f', n, mBr, phi, q));
+    axis([-1.5 1.5 -1 1]);
+end
